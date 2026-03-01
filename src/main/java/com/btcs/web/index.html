@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Order Book Simulator</title>
+
+    <style>
+        body {
+            font-family: Arial;
+            background: #111;
+            color: #eee;
+        }
+
+        #books {
+            display: flex;
+            gap: 20px;
+            flex-wrap: wrap;
+        }
+
+        .book {
+            background: #1a1a1a;
+            padding: 12px;
+            border-radius: 8px;
+            box-shadow: 0 0 10px rgba(0,0,0,0.5);
+            min-width: 260px;
+        }
+
+        table {
+            border-collapse: collapse;
+            font-size: 14px;
+            width: 100%;
+        }
+
+        th, td {
+            border: 1px solid #333;
+            padding: 4px 8px;
+            text-align: right;
+        }
+
+        th {
+            background: #222;
+            text-align: center;
+        }
+
+        .bid-price { color: #00c853; font-weight: bold; }
+        .ask-price { color: #ff5252; font-weight: bold; }
+
+        .flash-green {
+            background-color: rgba(0, 200, 83, 0.3);
+            transition: background-color 0.6s ease;
+        }
+
+        .flash-red {
+            background-color: rgba(255, 82, 82, 0.3);
+            transition: background-color 0.6s ease;
+        }
+
+        .ltp {
+            text-align: center;
+            font-size: 15px;
+            margin-bottom: 6px;
+        }
+
+        .ltp-price {
+            font-weight: bold;
+        }
+    </style>
+</head>
+
+<body>
+
+<h2>Exchange Simulator - Live Order Book</h2>
+<div id="books"></div>
+
+<script>
+
+const symbols = ["RELIANCE","HDFCBANK","BHARTIARTL","TCS","MRF"];
+const lastState = {};
+
+function createLayout() {
+    const container = document.getElementById("books");
+
+    symbols.forEach(sym => {
+        let html = `<div class="book" id="book-${sym}">`;
+        html += `<h3>${sym}</h3>`;
+        html += `<div class="ltp">LTP: <span id="${sym}-ltp" class="ltp-price">-</span></div>`;
+        html += `<table>
+                    <tr>
+                        <th>Qty</th>
+                        <th>Bid</th>
+                        <th>Ask</th>
+                        <th>Qty</th>
+                    </tr>`;
+
+        for (let i = 0; i < 5; i++) {
+            html += `<tr>
+                        <td id="${sym}-bqty-${i}"></td>
+                        <td id="${sym}-bprice-${i}" class="bid-price"></td>
+                        <td id="${sym}-sprice-${i}" class="ask-price"></td>
+                        <td id="${sym}-sqty-${i}"></td>
+                     </tr>`;
+        }
+
+        html += "</table></div>";
+        container.innerHTML += html;
+    });
+}
+
+function flash(element, className) {
+    element.classList.add(className);
+    setTimeout(() => element.classList.remove(className), 600);
+}
+
+function updateBook(book) {
+    if (!book.symbol) return;
+
+    const sym = book.symbol;
+    if (!lastState[sym]) lastState[sym] = {};
+
+    for (let i = 0; i < 5; i++) {
+        const b = book.buy[i] || {};
+        const s = book.sell[i] || {};
+
+        const bQty = b.qty || "";
+        const bPrice = b.price || "";
+        const sPrice = s.price || "";
+        const sQty = s.qty || "";
+
+        const bQtyEl = document.getElementById(`${sym}-bqty-${i}`);
+        const bPriceEl = document.getElementById(`${sym}-bprice-${i}`);
+        const sPriceEl = document.getElementById(`${sym}-sprice-${i}`);
+        const sQtyEl = document.getElementById(`${sym}-sqty-${i}`);
+
+        if (lastState[sym][`bprice-${i}`] !== bPrice)
+            flash(bPriceEl, "flash-green");
+
+        if (lastState[sym][`bqty-${i}`] !== bQty)
+            flash(bQtyEl, "flash-green");
+
+        if (lastState[sym][`sprice-${i}`] !== sPrice)
+            flash(sPriceEl, "flash-red");
+
+        if (lastState[sym][`sqty-${i}`] !== sQty)
+            flash(sQtyEl, "flash-red");
+
+        bQtyEl.innerText = bQty;
+        bPriceEl.innerText = bPrice;
+        sPriceEl.innerText = sPrice;
+        sQtyEl.innerText = sQty;
+
+        lastState[sym][`bprice-${i}`] = bPrice;
+        lastState[sym][`bqty-${i}`] = bQty;
+        lastState[sym][`sprice-${i}`] = sPrice;
+        lastState[sym][`sqty-${i}`] = sQty;
+    }
+
+    if (book.ltp) {
+        const ltpEl = document.getElementById(`${sym}-ltp`);
+
+        if (lastState[sym]["ltp"] !== book.ltp)
+            flash(ltpEl, "flash-green");
+
+        ltpEl.innerText = book.ltp;
+        lastState[sym]["ltp"] = book.ltp;
+    }
+}
+
+function loadBooks() {
+    fetch("/orderbooks")
+        .then(r => r.json())
+        .then(data => data.forEach(book => updateBook(book)));
+}
+
+createLayout();
+setInterval(loadBooks, 1000);
+loadBooks();
+
+</script>
+
+</body>
+</html>
