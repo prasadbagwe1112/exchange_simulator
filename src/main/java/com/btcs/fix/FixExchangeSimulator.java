@@ -81,4 +81,10 @@ public class FixExchangeSimulator extends MessageCracker implements Application 
 
         handler.handleReplace(replace, sessionId);
     }
+    
+    public void onMessage(OrderStatusRequest ordStatusReq, SessionID sessionId)
+            throws FieldNotFound {
+
+        handler.handleOrderStatusRequest(ordStatusReq, sessionId);
+    }
 }

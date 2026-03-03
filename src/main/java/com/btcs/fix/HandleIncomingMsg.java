@@ -178,7 +178,7 @@ public class HandleIncomingMsg {
 
         Order storedOrder = orderRepo.getOrder(origClOrdID.getValue());
 
-        ValidationResult result = validations.validateCancel(storedOrder);
+        ValidationResult result = validations.validateCancelorOSR(storedOrder);
         if (!result.isValid()) {
         	rejectCxl(sessionId, clOrdID, origClOrdID, CxlRejResponseTo.ORDER_CANCEL_REQUEST,
         			CxlRejReason.TOO_LATE_TO_CANCEL, result.getRejectReason());
@@ -194,6 +194,25 @@ public class HandleIncomingMsg {
 
         executions.sendCancelAck(sessionId, storedOrder, clOrdID, origClOrdID);
     }
+    
+    public void handleOrderStatusRequest(OrderStatusRequest ordStatusReq, SessionID sessionId)
+            throws FieldNotFound {
+
+        ClOrdID clOrdID = new ClOrdID(ordStatusReq.getString(ClOrdID.FIELD));
+        Symbol symbol = new Symbol(ordStatusReq.getString(Symbol.FIELD));
+        Side side = new Side(ordStatusReq.getChar(Side.FIELD));
+
+        Order storedOrder = orderRepo.getOrder(clOrdID.getValue());
+        ValidationResult result = validations.validateCancelorOSR(storedOrder);
+        if (!result.isValid()) {
+        	logger.info("no order found");
+        	rejectOrderOSR(sessionId, clOrdID, symbol, side, OrdRejReason.OTHER, result.getRejectReason());
+            return;
+        }
+        
+        executions.sendOrderStatus(storedOrder);
+    }
+    
 
     /* -------- Reject Helpers -------- */
     private void rejectOrder(
@@ -213,6 +232,23 @@ public class HandleIncomingMsg {
                 sessionId,
                 clOrdID,
                 symbol, side, ordType, tif, qty, price, stopPx,
+                reason,
+                text
+        );
+    }
+    // For Order Status Request
+    private void rejectOrderOSR(
+            SessionID sessionId,
+            ClOrdID clOrdID,
+            Symbol symbol,
+            Side side,
+            int reason,
+            String text
+    ) {
+        executions.sendOrderReject(
+                sessionId,
+                clOrdID,
+                symbol, side,
                 reason,
                 text
         );
