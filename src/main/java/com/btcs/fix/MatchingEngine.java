@@ -7,6 +7,8 @@ import java.util.Map;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import quickfix.field.OrdStatus;
+
 public class MatchingEngine {
 
 	private final Executions executions;
@@ -62,6 +64,10 @@ public class MatchingEngine {
 				// update AVG price
 				updateAvgPrice(buy, tradeQty, tradePrice);
 				updateAvgPrice(sell, tradeQty, tradePrice);
+				
+				// update Order Status
+				updateOrdStatus(buy);
+				updateOrdStatus(sell);
 
 				// send fills
 				executions.trade(buy, sell, tradeQty, tradePrice);
@@ -160,5 +166,11 @@ public class MatchingEngine {
 		newAvgPx = newAvgPx.setScale(4, RoundingMode.HALF_UP);
 		order.setCumQty(newCumQty);
 		order.setAvgPrice(newAvgPx);
+	}
+	
+	private void updateOrdStatus(Order order) {
+		if (order.getLeavesQty().signum() != 0) {
+			order.setOrdStatus(OrdStatus.PARTIALLY_FILLED);
+		}
 	}
 }

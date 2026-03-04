@@ -85,6 +85,10 @@ public class Order {
         this.ordType = ordType;
     }
     
+    public void setOrdStatus(char status) {
+        this.status = status;
+    }
+    
     public SessionID getSessionID() {
         return sessionID;
     }

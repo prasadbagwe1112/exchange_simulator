@@ -218,6 +218,35 @@ public class Executions {
         send(execReport, sessionId);
     }
     
+    public void sendOrderReject(
+            SessionID sessionId,
+            ClOrdID clOrdID,
+            Symbol symbol,
+            Side side,
+            int ordRejReason,
+            String text
+    ) {
+        ExecutionReport execReport = new ExecutionReport(
+                new OrderID("NONE"),
+                new ExecID(generateExecId()),
+                new ExecType(ExecType.REJECTED),
+                new OrdStatus(OrdStatus.REJECTED),
+                side,
+                new LeavesQty(0),
+                new CumQty(0),
+                new AvgPx(0)
+        );
+
+        execReport.set(clOrdID);
+        execReport.set(new OrderQty(0));
+        execReport.set(new Price(0));
+        execReport.set(symbol);
+        execReport.set(new OrdRejReason(ordRejReason));
+        execReport.set(new Text(text));
+        execReport.set(new TransactTime());
+        send(execReport, sessionId);
+    }
+    
     /* ---------------- Restated ---------------- */
     public void sendRestated(Order order, String text) {
         ExecutionReport execReport = new ExecutionReport(
@@ -297,6 +326,34 @@ public class Executions {
         
         if(order.getOrdType() == OrdType.LIMIT || order.getOrdType() == OrdType.STOP_LIMIT)
         	execReport.set(new Price(order.getPrice().doubleValue()));
+        
+        // Send to correct FIX session
+        send(execReport, order.getSessionID());
+    }
+    
+    /* ---------------- Response to OrderStatusRequest ---------------- */
+    public void sendOrderStatus(Order order) {
+        ExecutionReport execReport = new ExecutionReport(
+                new OrderID(order.getOrderId()),
+                new ExecID(generateExecId()),
+                new ExecType(ExecType.ORDER_STATUS),
+                new OrdStatus(order.getStatus()),
+                new Side(order.getSide()),
+                new LeavesQty(order.getLeavesQty().doubleValue()),
+                new CumQty(order.getCumQty().doubleValue()),
+                new AvgPx(order.getAvgPrice().doubleValue())
+        );
+
+        execReport.set(new ClOrdID(order.getClOrdId()));
+        execReport.set(new Symbol(order.getSymbol()));
+        execReport.set(new OrderQty(order.getOrderQty().doubleValue()));
+        execReport.set(new TimeInForce(order.getTimeInForce()));
+        execReport.set(new OrdType(order.getOrdType()));
+        
+        if(order.getOrdType() == OrdType.LIMIT || order.getOrdType() == OrdType.STOP_LIMIT)
+        	execReport.set(new Price(order.getPrice().doubleValue()));
+        if(order.getOrdType() == OrdType.STOP_STOP_LOSS || order.getOrdType() == OrdType.STOP_LIMIT)
+            execReport.set(new StopPx(order.getStopPx().doubleValue()));
         
         // Send to correct FIX session
         send(execReport, order.getSessionID());

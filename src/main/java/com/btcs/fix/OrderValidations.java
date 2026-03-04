@@ -139,7 +139,7 @@ public class OrderValidations {
     }
 
     /* -------- CANCEL VALIDATION -------- */
-    public ValidationResult validateCancel(Order storedOrder) {
+    public ValidationResult validateCancelorOSR(Order storedOrder) {
         if (storedOrder == null) {
             return ValidationResult.reject("Order not found");
         }
