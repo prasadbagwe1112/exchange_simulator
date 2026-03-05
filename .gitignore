@@ -24,6 +24,9 @@
 .project
 .settings/
 
+#intelliJ files
+.idea/
+
 # Runtime files
 exchange.pid
 store/

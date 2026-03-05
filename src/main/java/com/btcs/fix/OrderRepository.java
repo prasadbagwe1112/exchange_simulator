@@ -67,7 +67,6 @@ public class OrderRepository {
         logger.info("Order is added. clOrdId=" + clOrdId + ", totalOrders=" + ordersByClOrdId.size());
     }
 
-    // helper (optional, but useful later)
     public Order getOrder(String clOrdId) {
         return ordersByClOrdId.get(clOrdId);
     }
