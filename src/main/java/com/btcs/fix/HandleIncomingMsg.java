@@ -77,15 +77,26 @@ public class HandleIncomingMsg {
         );
         Order newOrder = orderRepo.getOrder(clOrdID.getValue());
         executions.sendNewAck(sessionId, clOrdID, orderID, side, qty, price, symbol, ordType, tif, stopPx);
-        addToBookAndMatch(side, ordType, stopPx, newOrder, book); 
+        addToBookAndMatch(sessionId, side, ordType, stopPx, newOrder, book);
     }
 
-	private void addToBookAndMatch(Side side, OrdType ordType, StopPx stopPx, Order order, OrderBook book) {
+	private void addToBookAndMatch(SessionID sessionId, Side side, OrdType ordType, StopPx stopPx, Order order, OrderBook book) {
 
 		if (ordType.getValue() == OrdType.LIMIT || ordType.getValue() == OrdType.MARKET) {
 
 			book.add(order);
 			matchingEngine.match(book, order.getSide());
+
+            Order orderToCxl = orderRepo.getOrder(order.getClOrdId());
+            if (orderToCxl != null) {
+                if (order.getTimeInForce() == TimeInForce.IMMEDIATE_OR_CANCEL || order.getTimeInForce() == TimeInForce.FILL_OR_KILL) {
+                    // remove from repository
+                    orderRepo.removeOrder(order.getClOrdId());
+                    // remove from book
+                    book.removeOrder(order.getClOrdId());
+                    executions.sendUnSolCancel(sessionId, order, order.getClOrdId(), "IOC/FOK Auto Canceled");
+                }
+            }
 			return;
 		}
 
