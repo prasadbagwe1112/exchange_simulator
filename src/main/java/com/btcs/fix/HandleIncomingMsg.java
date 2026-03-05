@@ -75,8 +75,7 @@ public class HandleIncomingMsg {
                 ordType.getValue(),
                 sessionId
         );
-        Order newOrder = orderRepo.getOrder(clOrdID.getValue()); 
-        logger.info("order price, stopPx >> " + newOrder.getPrice() + " " + newOrder.getStopPx());
+        Order newOrder = orderRepo.getOrder(clOrdID.getValue());
         executions.sendNewAck(sessionId, clOrdID, orderID, side, qty, price, symbol, ordType, tif, stopPx);
         addToBookAndMatch(side, ordType, stopPx, newOrder, book); 
     }
@@ -205,7 +204,6 @@ public class HandleIncomingMsg {
         Order storedOrder = orderRepo.getOrder(clOrdID.getValue());
         ValidationResult result = validations.validateCancelorOSR(storedOrder);
         if (!result.isValid()) {
-        	logger.info("no order found");
         	rejectOrderOSR(sessionId, clOrdID, symbol, side, OrdRejReason.OTHER, result.getRejectReason());
             return;
         }

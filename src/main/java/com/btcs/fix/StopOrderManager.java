@@ -6,6 +6,8 @@ import java.util.List;
 import java.util.NavigableMap;
 import java.util.TreeMap;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import quickfix.field.OrdType;
 
 public class StopOrderManager {
@@ -13,7 +15,8 @@ public class StopOrderManager {
     private final OrderBookManager bookManager;
     private final Executions executions;
     private final OrderRepository orderRepo;
-    
+
+    private static final Logger logger = LoggerFactory.getLogger("StopOrderManager");
 
     // BUY stop → trigger when LTP >= stopPx
     private final NavigableMap<BigDecimal, List<Order>> stopBuys = new TreeMap<>();
@@ -89,8 +92,6 @@ public class StopOrderManager {
 
         executions.sendRestated(restatedOrder, "Stop Order triggered");
         book.add(restatedOrder);
-        //return restatedOrder;
-        //matchingEngine.match(book, restatedOrder.getSide());
     }
     
 	private Order updateTriggeredOrder(Order order) {

@@ -9,7 +9,7 @@ public class OrderValidations {
 	
 	private static final List<String> ALLOWED_SYMBOLS = List.of("RELIANCE", "HDFCBANK", "BHARTIARTL", "TCS", "MRF");
 	private static final Set<Character> ALLOWED_ORD_TYPES = Set.of(OrdType.LIMIT, OrdType.MARKET, 
-			OrdType.STOP_LIMIT);
+			OrdType.STOP_LIMIT, OrdType.STOP_STOP_LOSS);
 	private static final Set<Character> STOP_ORD_TYPES = Set.of(OrdType.STOP_LIMIT, OrdType.STOP_STOP_LOSS);
 	private static final Set<Character> ALLOWED_TIFS = Set.of(TimeInForce.DAY, TimeInForce.GOOD_TILL_CANCEL, 
 			TimeInForce.IMMEDIATE_OR_CANCEL, TimeInForce.FILL_OR_KILL);
