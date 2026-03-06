@@ -3,6 +3,10 @@ package com.btcs.fix;
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.Set;
+
+import com.btcs.utils.Order;
+import com.btcs.utils.OrderBook;
+import com.btcs.utils.ValidationResult;
 import quickfix.field.*;
 
 public class OrderValidations {

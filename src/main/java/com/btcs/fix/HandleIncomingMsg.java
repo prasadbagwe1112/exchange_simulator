@@ -1,5 +1,6 @@
 package com.btcs.fix;
 
+import com.btcs.utils.*;
 import quickfix.field.*;
 import quickfix.fix44.*;
 import quickfix.Message;
@@ -87,6 +88,7 @@ public class HandleIncomingMsg {
 			book.add(order);
 			matchingEngine.match(book, order.getSide());
 
+            // IOC and FOK
             Order orderToCxl = orderRepo.getOrder(order.getClOrdId());
             if (orderToCxl != null) {
                 if (order.getTimeInForce() == TimeInForce.IMMEDIATE_OR_CANCEL || order.getTimeInForce() == TimeInForce.FILL_OR_KILL) {

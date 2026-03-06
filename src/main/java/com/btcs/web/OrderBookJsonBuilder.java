@@ -1,6 +1,6 @@
 package com.btcs.web;
 
-import com.btcs.fix.OrderBookSnapshot;
+import com.btcs.utils.OrderBookSnapshot;
 import java.math.BigDecimal;
 import java.util.List;
 

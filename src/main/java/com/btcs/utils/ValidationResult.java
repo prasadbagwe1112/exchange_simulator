@@ -1,4 +1,4 @@
-package com.btcs.fix;
+package com.btcs.utils;
 
 
 public class ValidationResult {

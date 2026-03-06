@@ -1,5 +1,6 @@
 package com.btcs.fix;
 
+import com.btcs.utils.Order;
 import quickfix.*;
 import quickfix.field.*;
 import quickfix.fix44.*;

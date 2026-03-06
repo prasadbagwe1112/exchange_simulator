@@ -6,6 +6,10 @@ import java.util.List;
 import java.util.NavigableMap;
 import java.util.TreeMap;
 
+import com.btcs.utils.Order;
+import com.btcs.utils.OrderBook;
+import com.btcs.utils.OrderBookManager;
+import com.btcs.utils.OrderRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import quickfix.field.OrdType;
