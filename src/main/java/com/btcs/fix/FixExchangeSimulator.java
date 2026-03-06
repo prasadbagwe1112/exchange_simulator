@@ -1,5 +1,7 @@
 package com.btcs.fix;
 
+import com.btcs.utils.OrderBookManager;
+import com.btcs.utils.OrderRepository;
 import quickfix.*;
 import quickfix.fix44.*;
 import quickfix.Message;

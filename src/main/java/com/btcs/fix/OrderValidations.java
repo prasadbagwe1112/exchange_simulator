@@ -3,6 +3,10 @@ package com.btcs.fix;
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.Set;
+
+import com.btcs.utils.Order;
+import com.btcs.utils.OrderBook;
+import com.btcs.utils.ValidationResult;
 import quickfix.field.*;
 
 public class OrderValidations {
@@ -10,9 +14,11 @@ public class OrderValidations {
 	private static final List<String> ALLOWED_SYMBOLS = List.of("RELIANCE", "HDFCBANK", "BHARTIARTL", "TCS", "MRF");
 	private static final Set<Character> ALLOWED_ORD_TYPES = Set.of(OrdType.LIMIT, OrdType.MARKET, 
 			OrdType.STOP_LIMIT, OrdType.STOP_STOP_LOSS);
-	private static final Set<Character> STOP_ORD_TYPES = Set.of(OrdType.STOP_LIMIT, OrdType.STOP_STOP_LOSS);
+    private static final Set<Character> LIMIT_MKT = Set.of(OrdType.LIMIT, OrdType.MARKET); // allowed ORD Types for IOC/FOK
+	private static final Set<Character> STOP_ORD = Set.of(OrdType.STOP_LIMIT, OrdType.STOP_STOP_LOSS);
 	private static final Set<Character> ALLOWED_TIFS = Set.of(TimeInForce.DAY, TimeInForce.GOOD_TILL_CANCEL, 
 			TimeInForce.IMMEDIATE_OR_CANCEL, TimeInForce.FILL_OR_KILL);
+    private static final Set<Character> IOC_FOK = Set.of(TimeInForce.IMMEDIATE_OR_CANCEL, TimeInForce.FILL_OR_KILL);
 
     /* -------- NEW ORDER VALIDATION -------- */
     public ValidationResult validateNewOrder(
@@ -32,6 +38,10 @@ public class OrderValidations {
         if (!ALLOWED_TIFS.contains(tif.getValue())) {
             return ValidationResult.reject("Invalid Time In Force");
         }
+
+        if ((IOC_FOK.contains(tif.getValue())) && !LIMIT_MKT.contains(ordType.getValue())) {
+            return ValidationResult.reject("Invalid Order Type for IOC/FOK Order");
+        }
         
         if (isPriceRequired(ordType.getValue()) && (price == null || price.getValue() <= 0)) {
         	return ValidationResult.reject("Invalid Price");
@@ -45,18 +55,18 @@ public class OrderValidations {
         	return ValidationResult.reject("Symbol not supported, use any one from - " + ALLOWED_SYMBOLS);
         }
         
-		if (side.getValue() == Side.BUY && STOP_ORD_TYPES.contains(ordType.getValue())
+		if (side.getValue() == Side.BUY && STOP_ORD.contains(ordType.getValue())
         		&& book.getLastTradedPrice() != null
         		&& stopPx.getValue() != 0
         		&& book.getLastTradedPrice().compareTo(BigDecimal.valueOf(stopPx.getValue())) >= 0) {
-			return ValidationResult.reject("Invalid Trigger Price");
+			return ValidationResult.reject("Invalid Trigger Price - Buy Stop PX cannot be <= LTP");
 		}
 		
-		if (side.getValue() == Side.SELL && STOP_ORD_TYPES.contains(ordType.getValue())
+		if (side.getValue() == Side.SELL && STOP_ORD.contains(ordType.getValue())
             	&& book.getLastTradedPrice() != null
             	&& stopPx.getValue() != 0
             	&& book.getLastTradedPrice().compareTo(BigDecimal.valueOf(stopPx.getValue())) <= 0) {
-			return ValidationResult.reject("Invalid Trigger Price");
+			return ValidationResult.reject("Invalid Trigger Price - Sell Stop PX cannot be >= LTP");
 		}
 		
 		if ((side.getValue() == Side.BUY 
@@ -65,39 +75,9 @@ public class OrderValidations {
 			(side.getValue() == Side.SELL 
 				&& ordType.getValue() == OrdType.STOP_LIMIT
         		&& price.getValue() > stopPx.getValue())) {
-			return ValidationResult.reject("Invalid Trigger Price");
+			return ValidationResult.reject("Invalid Trigger Price, Please check Price and StopPX");
 		}
 		
-        return ValidationResult.ok();
-    }
-    
-    /* -------- NEW ORDER VALIDATION -------- */
-    public ValidationResult validateNewStopOrder(
-            OrdType ordType,
-            TimeInForce tif,
-            Symbol symbol,
-            Order storedOrder,
-            Price price
-    ) {
-        if (!ALLOWED_ORD_TYPES.contains(ordType.getValue())) {
-            return ValidationResult.reject("Invalid Order Type");
-        }
-
-        if (!ALLOWED_TIFS.contains(tif.getValue())) {
-            return ValidationResult.reject("Invalid Time In Force");
-        }
-        
-        if (isPriceRequired(ordType.getValue()) && (price == null || price.getValue() <= 0)) {
-        	return ValidationResult.reject("Invalid Price");
-        }
-        
-        if (storedOrder != null) {
-        	return ValidationResult.reject("Duplicate ClOrdID");
-        }
-        
-        if (!ALLOWED_SYMBOLS.contains(symbol.getValue())) {
-        	return ValidationResult.reject("Symbol not supported, use any one from - " + ALLOWED_SYMBOLS);
-        }
         return ValidationResult.ok();
     }
 

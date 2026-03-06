@@ -4,10 +4,15 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.util.Deque;
 import java.util.Map;
+
+import com.btcs.utils.Order;
+import com.btcs.utils.OrderBook;
+import com.btcs.utils.OrderRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import quickfix.field.OrdStatus;
+import quickfix.field.TimeInForce;
 
 public class MatchingEngine {
 
@@ -34,8 +39,13 @@ public class MatchingEngine {
 				Order buy = bestBuyEntry.getValue().peekFirst();
 				Order sell = bestSellEntry.getValue().peekFirst();
 
+				// break trade loop when FOK Order cannot fulfill
+                if (checkIfFOKCanFF(buy, sell))
+					break;
+
 				book.logBook("BEFORE MATCH");
-				// price check
+
+				// break trade loop when buy price < sell price
 				if (!buy.isMarket() && !sell.isMarket()) {
 					if (buy.getPrice().compareTo(sell.getPrice()) < 0) {
 						break;
@@ -114,6 +124,15 @@ public class MatchingEngine {
 			}
 		}
 
+	}
+
+	private static boolean checkIfFOKCanFF(Order buy, Order sell) {
+		if (buy != null && buy.getTimeInForce() == TimeInForce.FILL_OR_KILL){
+            return buy.getLeavesQty().compareTo(sell.getLeavesQty()) > 0;
+		} else if (sell != null && sell.getTimeInForce() == TimeInForce.FILL_OR_KILL) {
+            return sell.getLeavesQty().compareTo(buy.getLeavesQty()) > 0;
+		}
+		return false;
 	}
 
 	private static void updateLvsQty(Order buy, BigDecimal tradeQty, Order sell) {

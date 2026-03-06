@@ -1,6 +1,7 @@
-package com.btcs.fix;
+package com.btcs.utils;
 
 import java.math.BigDecimal;
+
 import quickfix.SessionID;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;

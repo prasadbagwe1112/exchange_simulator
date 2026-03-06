@@ -1,9 +1,9 @@
 
 package com.btcs.web;
 
-import com.btcs.fix.OrderBook;
-import com.btcs.fix.OrderBookManager;
-import com.btcs.fix.OrderBookSnapshot;
+import com.btcs.utils.OrderBook;
+import com.btcs.utils.OrderBookManager;
+import com.btcs.utils.OrderBookSnapshot;
 import com.sun.net.httpserver.HttpServer;
 import java.io.InputStream;
 import java.io.OutputStream;

@@ -1,4 +1,4 @@
-package com.btcs.fix;
+package com.btcs.utils;
 
 import java.util.LinkedHashMap;
 import java.util.Map;

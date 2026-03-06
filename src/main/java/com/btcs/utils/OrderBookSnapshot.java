@@ -1,4 +1,4 @@
-package com.btcs.fix;
+package com.btcs.utils;
 
 import java.math.BigDecimal;
 import java.util.List;
