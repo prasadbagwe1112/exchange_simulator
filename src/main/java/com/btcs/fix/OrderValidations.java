@@ -59,14 +59,14 @@ public class OrderValidations {
         		&& book.getLastTradedPrice() != null
         		&& stopPx.getValue() != 0
         		&& book.getLastTradedPrice().compareTo(BigDecimal.valueOf(stopPx.getValue())) >= 0) {
-			return ValidationResult.reject("Invalid Trigger Price");
+			return ValidationResult.reject("Invalid Trigger Price - Buy Stop PX cannot be <= LTP");
 		}
 		
 		if (side.getValue() == Side.SELL && STOP_ORD.contains(ordType.getValue())
             	&& book.getLastTradedPrice() != null
             	&& stopPx.getValue() != 0
             	&& book.getLastTradedPrice().compareTo(BigDecimal.valueOf(stopPx.getValue())) <= 0) {
-			return ValidationResult.reject("Invalid Trigger Price");
+			return ValidationResult.reject("Invalid Trigger Price - Sell Stop PX cannot be >= LTP");
 		}
 		
 		if ((side.getValue() == Side.BUY 
@@ -75,7 +75,7 @@ public class OrderValidations {
 			(side.getValue() == Side.SELL 
 				&& ordType.getValue() == OrdType.STOP_LIMIT
         		&& price.getValue() > stopPx.getValue())) {
-			return ValidationResult.reject("Invalid Trigger Price");
+			return ValidationResult.reject("Invalid Trigger Price, Please check Price and StopPX");
 		}
 		
         return ValidationResult.ok();
