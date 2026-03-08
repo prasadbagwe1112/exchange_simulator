@@ -48,7 +48,7 @@ public class HandleIncomingMsg {
         Side side = new Side(order.getChar(Side.FIELD));
         OrderQty qty = new OrderQty(order.getDouble(OrderQty.FIELD));
         OrdType ordType = new OrdType(orderType);
-        Price price = getPriceForLimitOrder(order, orderType, side); 
+        Price price = getPrice(order, orderType, side);
         TimeInForce tif = new TimeInForce(order.getChar(TimeInForce.FIELD));
         OrderID orderID = new OrderID("ORD-" + System.currentTimeMillis());
         StopPx stopPx = getStopPriceForStopOrder(order, orderType);
@@ -285,12 +285,11 @@ public class HandleIncomingMsg {
         );
     }
     
-	private Price getPriceForLimitOrder(Message order, char orderType, Side side) throws FieldNotFound {
+	private Price getPrice(Message order, char orderType, Side side) throws FieldNotFound {
 		if (orderType == OrdType.LIMIT || orderType == OrdType.STOP_LIMIT) {
-        Price price = new Price(order.getDouble(Price.FIELD));
-        return price;
-        } else if ((orderType == OrdType.MARKET || orderType == OrdType.STOP_STOP_LOSS) && side.getValue() == '1') {
-    		return new Price(100000);	
+            return new Price(order.getDouble(Price.FIELD));
+        } else if ((orderType == OrdType.MARKET || orderType == OrdType.STOP_STOP_LOSS) && side.getValue() == Side.BUY) {
+    		return new Price(10000000); // 10M
         } else {
         	return new Price(0);
         }
@@ -298,8 +297,7 @@ public class HandleIncomingMsg {
 	
 	private StopPx getStopPriceForStopOrder(Message order, char orderType) throws FieldNotFound {
 		if (orderType == OrdType.STOP_STOP_LOSS || orderType == OrdType.STOP_LIMIT) {
-			StopPx stopPx = new StopPx(order.getDouble(StopPx.FIELD));
-        return stopPx;
+            return new StopPx(order.getDouble(StopPx.FIELD));
         } else {
         	return new StopPx(0);
         }
