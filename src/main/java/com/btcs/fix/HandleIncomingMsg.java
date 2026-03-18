@@ -122,9 +122,12 @@ public class HandleIncomingMsg {
         TimeInForce tif = new TimeInForce(replace.getChar(TimeInForce.FIELD));
         OrderQty quantity = new OrderQty(replace.getDouble(OrderQty.FIELD));
 
+        Price price = getPrice(replace, ordType.getValue(), side);
+        StopPx stopPx = getStopPriceForStopOrder(replace, ordType.getValue());
+
         Order storedOrder = orderRepo.getOrder(origClOrdID.getValue());
 
-        ValidationResult result = validations.validateReplace(storedOrder, ordType, symbol, side, tif, quantity);
+        ValidationResult result = validations.validateReplace(storedOrder, ordType, symbol, side, tif, quantity, price);
         if (!result.isValid()) {
         	rejectCxl(sessionId, clOrdID, origClOrdID, CxlRejResponseTo.ORDER_CANCEL_REPLACE_REQUEST,
             		CxlRejReason.OTHER, result.getRejectReason());
@@ -138,8 +141,8 @@ public class HandleIncomingMsg {
                 clOrdID,
                 origClOrdID,
                 new OrderQty(replace.getDouble(OrderQty.FIELD)),
-                new Price(replace.getDouble(Price.FIELD)),
-                new StopPx(replace.getDouble(StopPx.FIELD)),
+                new Price(price.getValue()),
+                new StopPx(stopPx.getValue()),
                 ordType
         );
         // remove old order from order repository
@@ -151,8 +154,8 @@ public class HandleIncomingMsg {
                 clOrdID.getValue(),
                 symbol.getValue(),
                 storedOrder.getSide(),
-                BigDecimal.valueOf(er.getPrice().getValue()),
-                BigDecimal.valueOf(er.getStopPx().getValue()),
+                BigDecimal.valueOf(price.getValue()),
+                BigDecimal.valueOf(stopPx.getValue()),
                 BigDecimal.valueOf(er.getOrderQty().getValue()),
                 BigDecimal.valueOf(er.getLeavesQty().getValue()),
                 storedOrder.getCumQty(),
@@ -175,9 +178,11 @@ public class HandleIncomingMsg {
         
         // add as fresh order in book
         Order replacedOrder = orderRepo.getOrder(clOrdID.getValue()); 
-        book.add(replacedOrder);
+        //book.add(replacedOrder);
         // try match
-        matchingEngine.match(book, replacedOrder.getSide());
+        //matchingEngine.match(book, replacedOrder.getSide());
+
+        addToBookAndMatch(sessionId, side, ordType, stopPx, replacedOrder, book);
      
     }
 

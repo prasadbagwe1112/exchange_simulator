@@ -1,5 +1,6 @@
 package com.btcs.fix;
 
+import com.btcs.utils.SymbolConfigLoader;
 import quickfix.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -26,6 +27,9 @@ public class FixEngineMain {
         // start web server
         WebServer webServer = new WebServer(port);
         webServer.start();
+
+        //load instrument details
+        SymbolConfigLoader.load("config/instruments.csv");
     	
         SessionSettings settings =
                 new SessionSettings(new FileInputStream("config/acceptor.cfg"));
