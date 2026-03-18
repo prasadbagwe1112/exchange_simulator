@@ -45,6 +45,7 @@ public class StopOrderManager {
                 order.getSide() == '1' ? stopBuys : stopSells;
 
         map.computeIfAbsent(stopPx, k -> new ArrayList<>()).add(order);
+        logger.info("stop order count >> " + map.size());
     }
 
     // ================================

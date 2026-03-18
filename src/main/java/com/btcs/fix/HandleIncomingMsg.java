@@ -81,35 +81,6 @@ public class HandleIncomingMsg {
         addToBookAndMatch(sessionId, side, ordType, stopPx, newOrder, book);
     }
 
-	private void addToBookAndMatch(SessionID sessionId, Side side, OrdType ordType, StopPx stopPx, Order order, OrderBook book) {
-
-		if (ordType.getValue() == OrdType.LIMIT || ordType.getValue() == OrdType.MARKET) {
-
-			book.add(order);
-			matchingEngine.match(book, order.getSide());
-
-            // IOC and FOK
-            Order orderToCxl = orderRepo.getOrder(order.getClOrdId());
-            if (orderToCxl != null) {
-                if (order.getTimeInForce() == TimeInForce.IMMEDIATE_OR_CANCEL || order.getTimeInForce() == TimeInForce.FILL_OR_KILL) {
-                    // remove from repository
-                    orderRepo.removeOrder(order.getClOrdId());
-                    // remove from book
-                    book.removeOrder(order.getClOrdId());
-                    executions.sendUnSolCancel(sessionId, order, order.getClOrdId(), "IOC/FOK Auto Canceled");
-                }
-            }
-			return;
-		}
-
-		// STOP ORDERS → DO NOT TOUCH BOOK
-		if (ordType.getValue() == OrdType.STOP_LIMIT || ordType.getValue() == OrdType.STOP_STOP_LOSS) { {
-			stopOrderManager.addStopOrder(order, BigDecimal.valueOf(stopPx.getValue()));			
-			logger.info("Stop order parked: {}", order.getClOrdId());
-	        }
-		}
-	}
-
     /* -------- REPLACE -------- */
     public void handleReplace(OrderCancelReplaceRequest replace, SessionID sessionId)
             throws FieldNotFound {
@@ -169,7 +140,7 @@ public class HandleIncomingMsg {
         logger.info("REPLACE RECEIVED -> origClOrdId={} newClOrdId={} newPrice={} newQty={}",
                 origClOrdID.getValue(),
                 clOrdID.getValue(),
-                er.getPrice().getValue(),
+                price.getValue(),
                 er.getOrderQty().getValue());
         
         // remove old order from book
@@ -177,13 +148,41 @@ public class HandleIncomingMsg {
         book.removeOrder(origClOrdID.getValue());
         
         // add as fresh order in book
-        Order replacedOrder = orderRepo.getOrder(clOrdID.getValue()); 
-        //book.add(replacedOrder);
-        // try match
-        //matchingEngine.match(book, replacedOrder.getSide());
+        Order replacedOrder = orderRepo.getOrder(clOrdID.getValue());
 
         addToBookAndMatch(sessionId, side, ordType, stopPx, replacedOrder, book);
      
+    }
+
+    private void addToBookAndMatch(SessionID sessionId, Side side, OrdType ordType, StopPx stopPx, Order order, OrderBook book) {
+
+        char ordTypeVal = ordType.getValue();
+
+        if (ordTypeVal == OrdType.LIMIT || ordTypeVal == OrdType.MARKET) {
+
+            book.add(order);
+            matchingEngine.match(book, order.getSide());
+
+            // IOC and FOK
+            Order orderToCxl = orderRepo.getOrder(order.getClOrdId());
+            if (orderToCxl != null) {
+                if (order.getTimeInForce() == TimeInForce.IMMEDIATE_OR_CANCEL || order.getTimeInForce() == TimeInForce.FILL_OR_KILL) {
+                    // remove from repository
+                    orderRepo.removeOrder(order.getClOrdId());
+                    // remove from book
+                    book.removeOrder(order.getClOrdId());
+                    executions.sendUnSolCancel(sessionId, order, order.getClOrdId(), "IOC/FOK Auto Canceled");
+                }
+            }
+            return;
+        }
+
+        // STOP ORDERS → DO NOT TOUCH BOOK
+        if (ordTypeVal == OrdType.STOP_LIMIT || ordTypeVal == OrdType.STOP_STOP_LOSS) { {
+            stopOrderManager.addStopOrder(order, BigDecimal.valueOf(stopPx.getValue()));
+            logger.info("Stop order parked: {}", order.getClOrdId());
+        }
+        }
     }
 
     /* -------- CANCEL -------- */

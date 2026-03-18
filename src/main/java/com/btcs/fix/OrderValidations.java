@@ -8,15 +8,25 @@ import com.btcs.utils.*;
 import quickfix.field.*;
 
 public class OrderValidations {
-	
-	private static final List<String> ALLOWED_SYMBOLS = List.of("RELIANCE", "HDFCBANK", "BHARTIARTL", "TCS", "MRF");
-	private static final Set<Character> ALLOWED_ORD_TYPES = Set.of(OrdType.LIMIT, OrdType.MARKET, 
-			OrdType.STOP_LIMIT, OrdType.STOP_STOP_LOSS);
-    private static final Set<Character> LIMIT_MKT = Set.of(OrdType.LIMIT, OrdType.MARKET); // allowed ORD Types for IOC/FOK
-	private static final Set<Character> STOP_ORD = Set.of(OrdType.STOP_LIMIT, OrdType.STOP_STOP_LOSS);
-	private static final Set<Character> ALLOWED_TIFS = Set.of(TimeInForce.DAY, TimeInForce.GOOD_TILL_CANCEL, 
-			TimeInForce.IMMEDIATE_OR_CANCEL, TimeInForce.FILL_OR_KILL);
-    private static final Set<Character> IOC_FOK = Set.of(TimeInForce.IMMEDIATE_OR_CANCEL, TimeInForce.FILL_OR_KILL);
+
+    private static final List<String> ALLOWED_SYMBOLS =
+            List.of("RELIANCE", "HDFCBANK", "BHARTIARTL", "TCS", "MRF");
+
+    private static final Set<Character> ALLOWED_ORD_TYPES =
+            Set.of(OrdType.LIMIT, OrdType.MARKET, OrdType.STOP_LIMIT, OrdType.STOP_STOP_LOSS);
+
+    private static final Set<Character> LIMIT_MKT =
+            Set.of(OrdType.LIMIT, OrdType.MARKET);
+
+    private static final Set<Character> STOP_ORD =
+            Set.of(OrdType.STOP_LIMIT, OrdType.STOP_STOP_LOSS);
+
+    private static final Set<Character> ALLOWED_TIFS =
+            Set.of(TimeInForce.DAY, TimeInForce.GOOD_TILL_CANCEL,
+                    TimeInForce.IMMEDIATE_OR_CANCEL, TimeInForce.FILL_OR_KILL);
+
+    private static final Set<Character> IOC_FOK =
+            Set.of(TimeInForce.IMMEDIATE_OR_CANCEL, TimeInForce.FILL_OR_KILL);
 
     /* -------- NEW ORDER VALIDATION -------- */
     public ValidationResult validateNewOrder(
@@ -29,57 +39,30 @@ public class OrderValidations {
             OrderBook book,
             Side side
     ) {
-        if (!ALLOWED_ORD_TYPES.contains(ordType.getValue())) {
-            return ValidationResult.reject("Invalid Order Type");
-        }
 
-        if (!ALLOWED_TIFS.contains(tif.getValue())) {
-            return ValidationResult.reject("Invalid Time In Force");
-        }
+        char ordTypeVal = ordType.getValue();
+        char tifVal = tif.getValue();
+        char sideVal = side.getValue();
 
-        if ((IOC_FOK.contains(tif.getValue())) && !LIMIT_MKT.contains(ordType.getValue())) {
-            return ValidationResult.reject("Invalid Order Type for IOC/FOK Order");
-        }
-        
-        if (isPriceRequired(ordType.getValue()) && (price == null || price.getValue() <= 0)) {
-        	return ValidationResult.reject("Invalid Price");
-        }
-        
-        if (storedOrder != null) {
-        	return ValidationResult.reject("Duplicate ClOrdID");
-        }
+        // basic validations
+        ValidationResult result = validateBasic(ordTypeVal, tifVal, storedOrder);
+        if (result != null) return result;
 
-        SymbolConfig config = SymbolConfigLoader.get(symbol.getValue());
+        // symbol config
+        SymbolConfig config = getSymbolConfig(symbol);
         if (config == null) {
-            return ValidationResult.reject("Symbol not supported, use any one from - " + ALLOWED_SYMBOLS);
+            return ValidationResult.reject(
+                    "Symbol not supported, use any one from - " + ALLOWED_SYMBOLS);
         }
 
-        ValidationResult priceCheck = getValidationResultForPrice(ordType, symbol, price, config);
-        if (priceCheck != null) return priceCheck;
+        // price validations
+        result = validatePrice(ordTypeVal, symbol, price, config);
+        if (result != null) return result;
 
-        if (side.getValue() == Side.BUY && STOP_ORD.contains(ordType.getValue())
-        		&& book.getLastTradedPrice() != null
-        		&& stopPx.getValue() != 0
-        		&& book.getLastTradedPrice().compareTo(BigDecimal.valueOf(stopPx.getValue())) >= 0) {
-			return ValidationResult.reject("Invalid Trigger Price - Buy Stop PX cannot be <= LTP");
-		}
-		
-		if (side.getValue() == Side.SELL && STOP_ORD.contains(ordType.getValue())
-            	&& book.getLastTradedPrice() != null
-            	&& stopPx.getValue() != 0
-            	&& book.getLastTradedPrice().compareTo(BigDecimal.valueOf(stopPx.getValue())) <= 0) {
-			return ValidationResult.reject("Invalid Trigger Price - Sell Stop PX cannot be >= LTP");
-		}
-		
-		if ((side.getValue() == Side.BUY 
-				&& ordType.getValue() == OrdType.STOP_LIMIT
-        		&& price.getValue() < stopPx.getValue()) ||
-			(side.getValue() == Side.SELL 
-				&& ordType.getValue() == OrdType.STOP_LIMIT
-        		&& price.getValue() > stopPx.getValue())) {
-			return ValidationResult.reject("Invalid Trigger Price, Please check Price and StopPX");
-		}
-		
+        // stop validations
+        result = validateStopConditions(ordTypeVal, sideVal, price, stopPx, book);
+        if (result != null) return result;
+
         return ValidationResult.ok();
     }
 
@@ -93,80 +76,163 @@ public class OrderValidations {
             OrderQty orderQty,
             Price price
     ) {
+
         if (storedOrder == null) {
             return ValidationResult.reject("Order not found");
         }
 
-        if (ordType != null && (storedOrder.getOrdType() != ordType.getValue())) {
+        // immutable fields validation
+        ValidationResult result = validateImmutableFields(storedOrder, ordType, side, tif);
+        if (result != null) return result;
+
+        // quantity validation
+        result = validateQuantity(storedOrder, orderQty);
+        if (result != null) return result;
+
+        // symbol validation
+        if (!storedOrder.getSymbol().equals(symbol.getValue())) {
+            return ValidationResult.reject("Symbol cannot be replaced");
+        }
+
+        SymbolConfig config = SymbolConfigLoader.get(symbol.getValue());
+
+        // price validation
+        result = validatePrice(ordType.getValue(), symbol, price, config);
+        if (result != null) return result;
+
+        return ValidationResult.ok();
+    }
+
+    /* -------- CANCEL VALIDATION -------- */
+    public ValidationResult validateCancelorOSR(Order storedOrder) {
+        return (storedOrder == null)
+                ? ValidationResult.reject("Order not found")
+                : ValidationResult.ok();
+    }
+
+    /* ----------------- Helper methods ------------------------- */
+
+    private ValidationResult validateBasic(char ordType, char tif, Order storedOrder) {
+
+        if (!ALLOWED_ORD_TYPES.contains(ordType)) {
+            return ValidationResult.reject("Invalid Order Type");
+        }
+
+        if (!ALLOWED_TIFS.contains(tif)) {
+            return ValidationResult.reject("Invalid Time In Force");
+        }
+
+        if (IOC_FOK.contains(tif) && !LIMIT_MKT.contains(ordType)) {
+            return ValidationResult.reject("Invalid Order Type for IOC/FOK Order");
+        }
+
+        if (storedOrder != null) {
+            return ValidationResult.reject("Duplicate ClOrdID");
+        }
+
+        return null;
+    }
+
+    private SymbolConfig getSymbolConfig(Symbol symbol) {
+        return SymbolConfigLoader.get(symbol.getValue());
+    }
+
+    private ValidationResult validatePrice(char ordType, Symbol symbol,
+                                           Price price, SymbolConfig config) {
+
+        if (!isPriceRequired(ordType)) return null;
+
+        if (price == null || price.getValue() <= 0) {
+            return ValidationResult.reject("Invalid Price");
+        }
+
+        BigDecimal px = BigDecimal.valueOf(price.getValue());
+
+        if (!isValidTick(px, config.getTickSize())) {
+            return ValidationResult.reject(
+                    "Invalid Tick Size, " + symbol.getValue() + ":" + config.getTickSize());
+        }
+
+        BigDecimal ref = config.getRefPrice();
+        BigDecimal upper = ref.multiply(BigDecimal.valueOf(1.10));
+        BigDecimal lower = ref.multiply(BigDecimal.valueOf(0.90));
+
+        if (px.compareTo(upper) > 0 || px.compareTo(lower) < 0) {
+            return ValidationResult.reject(
+                    "Invalid price: outside ±10% band of reference price (" + ref + ")");
+        }
+
+        return null;
+    }
+
+    private ValidationResult validateStopConditions(char ordType, char side,
+                                                    Price price, StopPx stopPx,
+                                                    OrderBook book) {
+
+        if (!STOP_ORD.contains(ordType) || stopPx == null || book.getLastTradedPrice() == null) {
+            return null;
+        }
+
+        BigDecimal ltp = book.getLastTradedPrice();
+        BigDecimal stop = BigDecimal.valueOf(stopPx.getValue());
+
+        if (side == Side.BUY && ltp.compareTo(stop) >= 0) {
+            return ValidationResult.reject("Buy StopPx must be > LTP");
+        }
+
+        if (side == Side.SELL && ltp.compareTo(stop) <= 0) {
+            return ValidationResult.reject("Sell StopPx must be < LTP");
+        }
+
+        if (ordType == OrdType.STOP_LIMIT && price != null) {
+            double px = price.getValue();
+
+            if ((side == Side.BUY && px < stopPx.getValue()) ||
+                    (side == Side.SELL && px > stopPx.getValue())) {
+                return ValidationResult.reject("Invalid Price vs StopPx relation");
+            }
+        }
+
+        return null;
+    }
+
+    private ValidationResult validateImmutableFields(Order storedOrder,
+                                                     OrdType ordType,
+                                                     Side side,
+                                                     TimeInForce tif) {
+
+        if (ordType != null && storedOrder.getOrdType() != ordType.getValue()) {
             return ValidationResult.reject("Order Type cannot be replaced");
         }
 
-        if (side != null && side.getValue() != storedOrder.getSide()) {
+        if (side != null && storedOrder.getSide() != side.getValue()) {
             return ValidationResult.reject("Side cannot be replaced");
         }
 
-        if (tif != null && tif.getValue() != storedOrder.getTimeInForce()) {
+        if (tif != null && storedOrder.getTimeInForce() != tif.getValue()) {
             return ValidationResult.reject("Time In Force cannot be replaced");
         }
-        
-        BigDecimal leavesQty = new BigDecimal(orderQty.getValue()).subtract(storedOrder.getCumQty());
+
+        return null;
+    }
+
+    private ValidationResult validateQuantity(Order storedOrder, OrderQty orderQty) {
+
+        BigDecimal leavesQty = BigDecimal.valueOf(orderQty.getValue())
+                .subtract(storedOrder.getCumQty());
+
         if (leavesQty.compareTo(BigDecimal.ZERO) <= 0) {
             return ValidationResult.reject("Invalid Order Quantity");
         }
 
-        SymbolConfig config = SymbolConfigLoader.get(symbol.getValue());
-        if (config == null) {
-            if (!storedOrder.getSymbol().equals(symbol.getValue())) {
-                return ValidationResult.reject("Symbol cannot be replaced");
-            }
-        }
-
-        ValidationResult priceCheck = getValidationResultForPrice(ordType, symbol, price, config);
-        if (priceCheck != null) return priceCheck;
-
-        return ValidationResult.ok();
+        return null;
     }
-
-
-    /* -------- CANCEL VALIDATION -------- */
-    public ValidationResult validateCancelorOSR(Order storedOrder) {
-        if (storedOrder == null) {
-            return ValidationResult.reject("Order not found");
-        }
-        return ValidationResult.ok();
-    }
-
-    /*----------------- Helper methods -------------------------*/
 
     private boolean isPriceRequired(char ordType) {
-    	return ordType == OrdType.LIMIT || ordType == OrdType.STOP_LIMIT;
+        return ordType == OrdType.LIMIT || ordType == OrdType.STOP_LIMIT;
     }
 
     private boolean isValidTick(BigDecimal price, BigDecimal tickSize) {
-
-        BigDecimal remainder = price.remainder(tickSize);
-
-        return remainder.compareTo(BigDecimal.ZERO) == 0;
-    }
-
-    private ValidationResult getValidationResultForPrice(OrdType ordType, Symbol symbol, Price price, SymbolConfig config) {
-        if (price != null && isPriceRequired(ordType.getValue())) {
-
-            BigDecimal px = BigDecimal.valueOf(price.getValue());
-            BigDecimal ref = config.getRefPrice();
-            BigDecimal upper = ref.multiply(new BigDecimal("1.10"));
-            BigDecimal lower = ref.multiply(new BigDecimal("0.90"));
-
-            if (!isValidTick(px, config.getTickSize())) {
-                return ValidationResult.reject(
-                        "Invalid Tick Size, " + symbol.getValue() + ":" + config.getTickSize()
-                );
-            }
-
-            // validate if price is > or < 10% of Ref Price
-            if (px.compareTo(upper) > 0 || px.compareTo(lower) < 0)
-                return ValidationResult.reject("Invalid price: order price is outside the permitted ±10% band of the reference price (" + ref + ").");
-        }
-        return null;
+        return price.remainder(tickSize).compareTo(BigDecimal.ZERO) == 0;
     }
 }
