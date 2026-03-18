@@ -87,6 +87,8 @@ public class Executions {
         
         if(ordType.getValue() == OrdType.LIMIT || ordType.getValue() == OrdType.STOP_LIMIT)
             execReport.set(price);
+        if((ordType.getValue() == OrdType.STOP_STOP_LOSS || ordType.getValue() == OrdType.STOP_LIMIT) && stopPx != null)
+            execReport.set(stopPx);
 
         send(execReport, sessionId);
         

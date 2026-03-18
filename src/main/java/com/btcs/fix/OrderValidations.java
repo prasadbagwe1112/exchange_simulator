@@ -4,9 +4,7 @@ import java.math.BigDecimal;
 import java.util.List;
 import java.util.Set;
 
-import com.btcs.utils.Order;
-import com.btcs.utils.OrderBook;
-import com.btcs.utils.ValidationResult;
+import com.btcs.utils.*;
 import quickfix.field.*;
 
 public class OrderValidations {
@@ -50,12 +48,16 @@ public class OrderValidations {
         if (storedOrder != null) {
         	return ValidationResult.reject("Duplicate ClOrdID");
         }
-        
-        if (!ALLOWED_SYMBOLS.contains(symbol.getValue())) {
-        	return ValidationResult.reject("Symbol not supported, use any one from - " + ALLOWED_SYMBOLS);
+
+        SymbolConfig config = SymbolConfigLoader.get(symbol.getValue());
+        if (config == null) {
+            return ValidationResult.reject("Symbol not supported, use any one from - " + ALLOWED_SYMBOLS);
         }
-        
-		if (side.getValue() == Side.BUY && STOP_ORD.contains(ordType.getValue())
+
+        ValidationResult priceCheck = getValidationResultForPrice(ordType, symbol, price, config);
+        if (priceCheck != null) return priceCheck;
+
+        if (side.getValue() == Side.BUY && STOP_ORD.contains(ordType.getValue())
         		&& book.getLastTradedPrice() != null
         		&& stopPx.getValue() != 0
         		&& book.getLastTradedPrice().compareTo(BigDecimal.valueOf(stopPx.getValue())) >= 0) {
@@ -88,7 +90,8 @@ public class OrderValidations {
             Symbol symbol,
             Side side,
             TimeInForce tif,
-            OrderQty orderQty
+            OrderQty orderQty,
+            Price price
     ) {
         if (storedOrder == null) {
             return ValidationResult.reject("Order not found");
@@ -96,10 +99,6 @@ public class OrderValidations {
 
         if (ordType != null && (storedOrder.getOrdType() != ordType.getValue())) {
             return ValidationResult.reject("Order Type cannot be replaced");
-        }
-
-        if (symbol != null && !storedOrder.getSymbol().equals(symbol.getValue())) {
-            return ValidationResult.reject("Symbol cannot be replaced");
         }
 
         if (side != null && side.getValue() != storedOrder.getSide()) {
@@ -114,9 +113,20 @@ public class OrderValidations {
         if (leavesQty.compareTo(BigDecimal.ZERO) <= 0) {
             return ValidationResult.reject("Invalid Order Quantity");
         }
-        
+
+        SymbolConfig config = SymbolConfigLoader.get(symbol.getValue());
+        if (config == null) {
+            if (!storedOrder.getSymbol().equals(symbol.getValue())) {
+                return ValidationResult.reject("Symbol cannot be replaced");
+            }
+        }
+
+        ValidationResult priceCheck = getValidationResultForPrice(ordType, symbol, price, config);
+        if (priceCheck != null) return priceCheck;
+
         return ValidationResult.ok();
     }
+
 
     /* -------- CANCEL VALIDATION -------- */
     public ValidationResult validateCancelorOSR(Order storedOrder) {
@@ -125,8 +135,38 @@ public class OrderValidations {
         }
         return ValidationResult.ok();
     }
-    
+
+    /*----------------- Helper methods -------------------------*/
+
     private boolean isPriceRequired(char ordType) {
     	return ordType == OrdType.LIMIT || ordType == OrdType.STOP_LIMIT;
+    }
+
+    private boolean isValidTick(BigDecimal price, BigDecimal tickSize) {
+
+        BigDecimal remainder = price.remainder(tickSize);
+
+        return remainder.compareTo(BigDecimal.ZERO) == 0;
+    }
+
+    private ValidationResult getValidationResultForPrice(OrdType ordType, Symbol symbol, Price price, SymbolConfig config) {
+        if (price != null && isPriceRequired(ordType.getValue())) {
+
+            BigDecimal px = BigDecimal.valueOf(price.getValue());
+            BigDecimal ref = config.getRefPrice();
+            BigDecimal upper = ref.multiply(new BigDecimal("1.10"));
+            BigDecimal lower = ref.multiply(new BigDecimal("0.90"));
+
+            if (!isValidTick(px, config.getTickSize())) {
+                return ValidationResult.reject(
+                        "Invalid Tick Size, " + symbol.getValue() + ":" + config.getTickSize()
+                );
+            }
+
+            // validate if price is > or < 10% of Ref Price
+            if (px.compareTo(upper) > 0 || px.compareTo(lower) < 0)
+                return ValidationResult.reject("Invalid price: order price is outside the permitted ±10% band of the reference price (" + ref + ").");
+        }
+        return null;
     }
 }
