@@ -17,6 +17,7 @@ public class Executions {
     /* ---------------- NEW ORDER ACK ---------------- */
     public void sendNewAck(
             SessionID sessionId,
+            Account account,
             ClOrdID clOrdID,
             OrderID orderID,
             Side side,
@@ -39,6 +40,7 @@ public class Executions {
         );
 
         execReport.set(clOrdID);
+        execReport.set(account);
         execReport.set(orderQty);
         execReport.set(symbol);
         execReport.set(timeInForce);
@@ -56,6 +58,7 @@ public class Executions {
     /* ---------------- REPLACE ACK ---------------- */
     public ExecutionReport sendReplaceAck(
             SessionID sessionId,
+            Account account,
             Order storedOrder,
             ClOrdID clOrdID,
             OrigClOrdID origClOrdID,
@@ -78,6 +81,7 @@ public class Executions {
         );
 
         execReport.set(clOrdID);
+        execReport.set(account);
         execReport.set(origClOrdID);
         execReport.set(orderQty);
         execReport.set(ordType);
@@ -115,6 +119,7 @@ public class Executions {
 
         execReport.set(clOrdID);
         execReport.set(origClOrdID);
+        execReport.set(new Account(storedOrder.getAccount()));
         execReport.set(new OrderQty(storedOrder.getOrderQty().doubleValue()));
         execReport.set(new Symbol(storedOrder.getSymbol()));
         execReport.set(new TransactTime());
@@ -124,10 +129,13 @@ public class Executions {
         if(storedOrder.getOrdType() == OrdType.LIMIT || storedOrder.getOrdType() == OrdType.STOP_LIMIT)
         	execReport.set(new Price(storedOrder.getPrice().doubleValue()));
 
+        if(storedOrder.getOrdType() == OrdType.STOP_STOP_LOSS || storedOrder.getOrdType() == OrdType.STOP_LIMIT)
+            execReport.set(new StopPx(storedOrder.getStopPx().doubleValue()));
+
         send(execReport, sessionId);
     }
     
-    /* ---------------- UNSOL CANCEL ACK ---------------- */
+    /* ---------------- UNSOLICITED CANCEL ACK ---------------- */
     public void sendUnSolCancel(
             SessionID sessionId,
             Order storedOrder,
@@ -146,11 +154,12 @@ public class Executions {
         );
 
         execReport.set(new ClOrdID(clOrdID));
+        execReport.set(new Account(storedOrder.getAccount()));
         execReport.set(new OrderQty(storedOrder.getOrderQty().doubleValue()));
         execReport.set(new Symbol(storedOrder.getSymbol()));
         execReport.set(new TransactTime());
         execReport.set(new TimeInForce(storedOrder.getTimeInForce()));
-        execReport.set(new OrdType(storedOrder.getOrdType()));;
+        execReport.set(new OrdType(storedOrder.getOrdType()));
         execReport.set(new Text(text));
         
         if(storedOrder.getOrdType() == OrdType.LIMIT || storedOrder.getOrdType() == OrdType.STOP_LIMIT)
@@ -264,6 +273,7 @@ public class Executions {
         );
 
         execReport.set(new ClOrdID(order.getClOrdId()));
+        execReport.set(new Account(order.getAccount()));
         execReport.set(new Symbol(order.getSymbol()));
         execReport.set(new OrderQty(order.getOrderQty().doubleValue()));
         execReport.set(new TimeInForce(order.getTimeInForce()));
@@ -320,6 +330,7 @@ public class Executions {
         );
 
         execReport.set(new ClOrdID(order.getClOrdId()));
+        execReport.set(new Account(order.getAccount()));
         execReport.set(new Symbol(order.getSymbol()));
         execReport.set(new LastQty(lastQty.doubleValue()));
         execReport.set(new LastPx(lastPx.doubleValue()));
@@ -352,6 +363,7 @@ public class Executions {
         execReport.set(new OrderQty(order.getOrderQty().doubleValue()));
         execReport.set(new TimeInForce(order.getTimeInForce()));
         execReport.set(new OrdType(order.getOrdType()));
+        execReport.set(new Account(order.getAccount()));
         
         if(order.getOrdType() == OrdType.LIMIT || order.getOrdType() == OrdType.STOP_LIMIT)
         	execReport.set(new Price(order.getPrice().doubleValue()));
@@ -367,7 +379,7 @@ public class Executions {
         try {
             Session.sendToTarget(msg, sessionId);
         } catch (SessionNotFound e) {
-            logger.error("Session not found: " + sessionId, e);
+            logger.error("Session not found: {}", sessionId, e);
         }
     }
 

@@ -45,7 +45,6 @@ public class StopOrderManager {
                 order.getSide() == '1' ? stopBuys : stopSells;
 
         map.computeIfAbsent(stopPx, k -> new ArrayList<>()).add(order);
-        logger.info("stop order count >> " + map.size());
     }
 
     // ================================
@@ -64,6 +63,10 @@ public class StopOrderManager {
 
         var triggered = stopBuys.headMap(ltp, true);
 
+        toRemove(symbol, triggered, stopBuys);
+    }
+
+    private void toRemove(String symbol, NavigableMap<BigDecimal, List<Order>> triggered, NavigableMap<BigDecimal, List<Order>> stopBuys) {
         List<BigDecimal> toRemove = new ArrayList<>();
 
         for (var entry : triggered.entrySet()) {
@@ -79,24 +82,19 @@ public class StopOrderManager {
 
         var triggered = stopSells.tailMap(ltp, true);
 
-        List<BigDecimal> toRemove = new ArrayList<>();
-
-        for (var entry : triggered.entrySet()) {
-            for (Order order : entry.getValue()) {
-                activate(order, symbol);
-            }
-            toRemove.add(entry.getKey());
-        }
-        toRemove.forEach(stopSells::remove);
+        toRemove(symbol, triggered, stopSells);
     }
 
     private void activate(Order order, String symbol) {
 
-        OrderBook book = bookManager.getBook(symbol);
-        Order restatedOrder = updateTriggeredOrder(order);
+        if (orderRepo.getOrder(order.getClOrdId()) != null) { // check if order to activate is present in the repo
+            logger.info("Stop Order triggered = {}", order.getOrderId());
+            OrderBook book = bookManager.getBook(symbol);
+            Order restatedOrder = updateTriggeredOrder(order);
 
-        executions.sendRestated(restatedOrder, "Stop Order triggered");
-        book.add(restatedOrder);
+            executions.sendRestated(restatedOrder, "Stop Order triggered");
+            book.add(restatedOrder);
+        }
     }
     
 	private Order updateTriggeredOrder(Order order) {

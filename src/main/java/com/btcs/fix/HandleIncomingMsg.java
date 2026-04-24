@@ -42,7 +42,8 @@ public class HandleIncomingMsg {
     public void handleNewOrder(Message order, SessionID sessionId) throws FieldNotFound {
     	
     	char orderType = order.getChar(OrdType.FIELD);
-    	
+
+        Account account = new Account(order.getString(Account.FIELD));
         ClOrdID clOrdID = new ClOrdID(order.getString(ClOrdID.FIELD));
         Symbol symbol = new Symbol(order.getString(Symbol.FIELD));
         Side side = new Side(order.getChar(Side.FIELD));
@@ -61,6 +62,7 @@ public class HandleIncomingMsg {
             return;
         }
         orderRepo.saveNewOrder(
+                account.getValue(),
                 orderID.getValue(),
                 clOrdID.getValue(),
                 symbol.getValue(),
@@ -77,7 +79,7 @@ public class HandleIncomingMsg {
                 sessionId
         );
         Order newOrder = orderRepo.getOrder(clOrdID.getValue());
-        executions.sendNewAck(sessionId, clOrdID, orderID, side, qty, price, symbol, ordType, tif, stopPx);
+        executions.sendNewAck(sessionId, account, clOrdID, orderID, side, qty, price, symbol, ordType, tif, stopPx);
         addToBookAndMatch(sessionId, side, ordType, stopPx, newOrder, book);
     }
 
@@ -87,6 +89,7 @@ public class HandleIncomingMsg {
 
         OrigClOrdID origClOrdID = new OrigClOrdID(replace.getString(OrigClOrdID.FIELD));
         ClOrdID clOrdID = new ClOrdID(replace.getString(ClOrdID.FIELD));
+        Account account = new Account(replace.getString(Account.FIELD));
         OrdType ordType = new OrdType(replace.getChar(OrdType.FIELD));
         Symbol symbol = new Symbol(replace.getString(Symbol.FIELD));
         Side side = new Side(replace.getChar(Side.FIELD));
@@ -98,7 +101,7 @@ public class HandleIncomingMsg {
 
         Order storedOrder = orderRepo.getOrder(origClOrdID.getValue());
 
-        ValidationResult result = validations.validateReplace(storedOrder, ordType, symbol, side, tif, quantity, price);
+        ValidationResult result = validations.validateReplace(storedOrder, ordType, symbol, side, tif, quantity, price, stopPx, account);
         if (!result.isValid()) {
         	rejectCxl(sessionId, clOrdID, origClOrdID, CxlRejResponseTo.ORDER_CANCEL_REPLACE_REQUEST,
             		CxlRejReason.OTHER, result.getRejectReason());
@@ -108,6 +111,7 @@ public class HandleIncomingMsg {
         //Send ER replace
         ExecutionReport er = executions.sendReplaceAck(
                 sessionId,
+                account,
                 storedOrder,
                 clOrdID,
                 origClOrdID,
@@ -121,6 +125,7 @@ public class HandleIncomingMsg {
         
         //add replaced order in repository
         orderRepo.saveNewOrder(
+                storedOrder.getAccount(),
                 storedOrder.getOrderId(),
                 clOrdID.getValue(),
                 symbol.getValue(),

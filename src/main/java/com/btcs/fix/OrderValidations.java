@@ -2,6 +2,7 @@ package com.btcs.fix;
 
 import java.math.BigDecimal;
 import java.util.List;
+import java.util.Objects;
 import java.util.Set;
 
 import com.btcs.utils.*;
@@ -56,7 +57,7 @@ public class OrderValidations {
         }
 
         // price validations
-        result = validatePrice(ordTypeVal, symbol, price, config);
+        result = validatePrice(ordTypeVal, symbol, price, stopPx, config);
         if (result != null) return result;
 
         // stop validations
@@ -74,7 +75,9 @@ public class OrderValidations {
             Side side,
             TimeInForce tif,
             OrderQty orderQty,
-            Price price
+            Price price,
+            StopPx stopPx,
+            Account account
     ) {
 
         if (storedOrder == null) {
@@ -82,7 +85,7 @@ public class OrderValidations {
         }
 
         // immutable fields validation
-        ValidationResult result = validateImmutableFields(storedOrder, ordType, side, tif);
+        ValidationResult result = validateImmutableFields(storedOrder, ordType, side, tif, account);
         if (result != null) return result;
 
         // quantity validation
@@ -97,7 +100,7 @@ public class OrderValidations {
         SymbolConfig config = SymbolConfigLoader.get(symbol.getValue());
 
         // price validation
-        result = validatePrice(ordType.getValue(), symbol, price, config);
+        result = validatePrice(ordType.getValue(), symbol, price, stopPx, config);
         if (result != null) return result;
 
         return ValidationResult.ok();
@@ -138,28 +141,43 @@ public class OrderValidations {
     }
 
     private ValidationResult validatePrice(char ordType, Symbol symbol,
-                                           Price price, SymbolConfig config) {
-
-        if (!isPriceRequired(ordType)) return null;
-
-        if (price == null || price.getValue() <= 0) {
-            return ValidationResult.reject("Invalid Price");
-        }
+                                           Price price, StopPx stopPx, SymbolConfig config) {
 
         BigDecimal px = BigDecimal.valueOf(price.getValue());
-
-        if (!isValidTick(px, config.getTickSize())) {
-            return ValidationResult.reject(
-                    "Invalid Tick Size, " + symbol.getValue() + ":" + config.getTickSize());
-        }
-
+        BigDecimal stpPx = BigDecimal.valueOf(stopPx.getValue());
         BigDecimal ref = config.getRefPrice();
+        BigDecimal tickSize = config.getTickSize();
         BigDecimal upper = ref.multiply(BigDecimal.valueOf(1.10));
         BigDecimal lower = ref.multiply(BigDecimal.valueOf(0.90));
 
-        if (px.compareTo(upper) > 0 || px.compareTo(lower) < 0) {
-            return ValidationResult.reject(
-                    "Invalid price: outside ±10% band of reference price (" + ref + ")");
+        if (isPriceRequired(ordType)) {
+            if (price.getValue() <= 0) {
+                return ValidationResult.reject("Invalid Price");
+            }
+
+            if (!isValidTick(px, tickSize)) {
+                return ValidationResult.reject(
+                        "Invalid Tick Size, " + symbol.getValue() + ":" + tickSize);
+            }
+
+            if (px.compareTo(upper) > 0 || px.compareTo(lower) < 0) {
+                return ValidationResult.reject(
+                        "Invalid Price: outside ±10% band of reference price (" + ref + ")");
+            }
+        } else if (isStopPriceRequired(ordType)) {
+            if (stopPx.getValue() <= 0) {
+                return ValidationResult.reject("Invalid Stop Price");
+            }
+
+            if (!isValidTick(stpPx, tickSize)) {
+                return ValidationResult.reject(
+                        "Invalid Tick Size, " + symbol.getValue() + ":" + tickSize);
+            }
+
+            if ((stpPx.compareTo(upper) > 0 || stpPx.compareTo(lower) < 0)) {
+                return ValidationResult.reject(
+                        "Invalid Stop Price: outside ±10% band of reference price (" + ref + ")");
+            }
         }
 
         return null;
@@ -199,7 +217,7 @@ public class OrderValidations {
     private ValidationResult validateImmutableFields(Order storedOrder,
                                                      OrdType ordType,
                                                      Side side,
-                                                     TimeInForce tif) {
+                                                     TimeInForce tif, Account account) {
 
         if (ordType != null && storedOrder.getOrdType() != ordType.getValue()) {
             return ValidationResult.reject("Order Type cannot be replaced");
@@ -211,6 +229,10 @@ public class OrderValidations {
 
         if (tif != null && storedOrder.getTimeInForce() != tif.getValue()) {
             return ValidationResult.reject("Time In Force cannot be replaced");
+        }
+
+        if (account != null && !storedOrder.getAccount().equals(account.getValue())) {
+            return ValidationResult.reject("Account cannot be replaced");
         }
 
         return null;
@@ -230,6 +252,10 @@ public class OrderValidations {
 
     private boolean isPriceRequired(char ordType) {
         return ordType == OrdType.LIMIT || ordType == OrdType.STOP_LIMIT;
+    }
+
+    private boolean isStopPriceRequired(char ordType) {
+        return ordType == OrdType.STOP_STOP_LOSS || ordType == OrdType.STOP_LIMIT;
     }
 
     private boolean isValidTick(BigDecimal price, BigDecimal tickSize) {

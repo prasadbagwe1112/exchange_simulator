@@ -6,6 +6,7 @@ import quickfix.field.OrdType;
 
 public class Order {
 
+    private final String account;
     private final String orderId;
     private final String clOrdId;
     private final String symbol;
@@ -22,6 +23,7 @@ public class Order {
     private SessionID sessionID;
 
     public Order(
+            String account,
             String orderId,
             String clOrdId,
             String symbol,
@@ -38,6 +40,7 @@ public class Order {
             SessionID sessionID
             
     ) {
+        this.account = account;
         this.orderId = orderId;
         this.clOrdId = clOrdId;
         this.symbol = symbol;
@@ -55,6 +58,7 @@ public class Order {
     }
 
     // getters (only if needed later)
+    public  String getAccount() { return account; }
     public String getClOrdId() { return clOrdId; }
     public String getOrderId() { return orderId; }
     public String getSymbol() { return symbol; }
