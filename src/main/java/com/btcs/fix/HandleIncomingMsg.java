@@ -42,7 +42,8 @@ public class HandleIncomingMsg {
     public void handleNewOrder(Message order, SessionID sessionId) throws FieldNotFound {
     	
     	char orderType = order.getChar(OrdType.FIELD);
-    	
+
+        Account account = new Account(order.getString(Account.FIELD));
         ClOrdID clOrdID = new ClOrdID(order.getString(ClOrdID.FIELD));
         Symbol symbol = new Symbol(order.getString(Symbol.FIELD));
         Side side = new Side(order.getChar(Side.FIELD));
@@ -61,6 +62,7 @@ public class HandleIncomingMsg {
             return;
         }
         orderRepo.saveNewOrder(
+                account.getValue(),
                 orderID.getValue(),
                 clOrdID.getValue(),
                 symbol.getValue(),
@@ -77,38 +79,9 @@ public class HandleIncomingMsg {
                 sessionId
         );
         Order newOrder = orderRepo.getOrder(clOrdID.getValue());
-        executions.sendNewAck(sessionId, clOrdID, orderID, side, qty, price, symbol, ordType, tif, stopPx);
+        executions.sendNewAck(sessionId, account, clOrdID, orderID, side, qty, price, symbol, ordType, tif, stopPx);
         addToBookAndMatch(sessionId, side, ordType, stopPx, newOrder, book);
     }
-
-	private void addToBookAndMatch(SessionID sessionId, Side side, OrdType ordType, StopPx stopPx, Order order, OrderBook book) {
-
-		if (ordType.getValue() == OrdType.LIMIT || ordType.getValue() == OrdType.MARKET) {
-
-			book.add(order);
-			matchingEngine.match(book, order.getSide());
-
-            // IOC and FOK
-            Order orderToCxl = orderRepo.getOrder(order.getClOrdId());
-            if (orderToCxl != null) {
-                if (order.getTimeInForce() == TimeInForce.IMMEDIATE_OR_CANCEL || order.getTimeInForce() == TimeInForce.FILL_OR_KILL) {
-                    // remove from repository
-                    orderRepo.removeOrder(order.getClOrdId());
-                    // remove from book
-                    book.removeOrder(order.getClOrdId());
-                    executions.sendUnSolCancel(sessionId, order, order.getClOrdId(), "IOC/FOK Auto Canceled");
-                }
-            }
-			return;
-		}
-
-		// STOP ORDERS → DO NOT TOUCH BOOK
-		if (ordType.getValue() == OrdType.STOP_LIMIT || ordType.getValue() == OrdType.STOP_STOP_LOSS) { {
-			stopOrderManager.addStopOrder(order, BigDecimal.valueOf(stopPx.getValue()));			
-			logger.info("Stop order parked: {}", order.getClOrdId());
-	        }
-		}
-	}
 
     /* -------- REPLACE -------- */
     public void handleReplace(OrderCancelReplaceRequest replace, SessionID sessionId)
@@ -116,6 +89,7 @@ public class HandleIncomingMsg {
 
         OrigClOrdID origClOrdID = new OrigClOrdID(replace.getString(OrigClOrdID.FIELD));
         ClOrdID clOrdID = new ClOrdID(replace.getString(ClOrdID.FIELD));
+        Account account = new Account(replace.getString(Account.FIELD));
         OrdType ordType = new OrdType(replace.getChar(OrdType.FIELD));
         Symbol symbol = new Symbol(replace.getString(Symbol.FIELD));
         Side side = new Side(replace.getChar(Side.FIELD));
@@ -127,7 +101,7 @@ public class HandleIncomingMsg {
 
         Order storedOrder = orderRepo.getOrder(origClOrdID.getValue());
 
-        ValidationResult result = validations.validateReplace(storedOrder, ordType, symbol, side, tif, quantity, price);
+        ValidationResult result = validations.validateReplace(storedOrder, ordType, symbol, side, tif, quantity, price, stopPx, account);
         if (!result.isValid()) {
         	rejectCxl(sessionId, clOrdID, origClOrdID, CxlRejResponseTo.ORDER_CANCEL_REPLACE_REQUEST,
             		CxlRejReason.OTHER, result.getRejectReason());
@@ -137,6 +111,7 @@ public class HandleIncomingMsg {
         //Send ER replace
         ExecutionReport er = executions.sendReplaceAck(
                 sessionId,
+                account,
                 storedOrder,
                 clOrdID,
                 origClOrdID,
@@ -150,6 +125,7 @@ public class HandleIncomingMsg {
         
         //add replaced order in repository
         orderRepo.saveNewOrder(
+                storedOrder.getAccount(),
                 storedOrder.getOrderId(),
                 clOrdID.getValue(),
                 symbol.getValue(),
@@ -169,7 +145,7 @@ public class HandleIncomingMsg {
         logger.info("REPLACE RECEIVED -> origClOrdId={} newClOrdId={} newPrice={} newQty={}",
                 origClOrdID.getValue(),
                 clOrdID.getValue(),
-                er.getPrice().getValue(),
+                price.getValue(),
                 er.getOrderQty().getValue());
         
         // remove old order from book
@@ -177,13 +153,41 @@ public class HandleIncomingMsg {
         book.removeOrder(origClOrdID.getValue());
         
         // add as fresh order in book
-        Order replacedOrder = orderRepo.getOrder(clOrdID.getValue()); 
-        //book.add(replacedOrder);
-        // try match
-        //matchingEngine.match(book, replacedOrder.getSide());
+        Order replacedOrder = orderRepo.getOrder(clOrdID.getValue());
 
         addToBookAndMatch(sessionId, side, ordType, stopPx, replacedOrder, book);
      
+    }
+
+    private void addToBookAndMatch(SessionID sessionId, Side side, OrdType ordType, StopPx stopPx, Order order, OrderBook book) {
+
+        char ordTypeVal = ordType.getValue();
+
+        if (ordTypeVal == OrdType.LIMIT || ordTypeVal == OrdType.MARKET) {
+
+            book.add(order);
+            matchingEngine.match(book, order.getSide());
+
+            // IOC and FOK
+            Order orderToCxl = orderRepo.getOrder(order.getClOrdId());
+            if (orderToCxl != null) {
+                if (order.getTimeInForce() == TimeInForce.IMMEDIATE_OR_CANCEL || order.getTimeInForce() == TimeInForce.FILL_OR_KILL) {
+                    // remove from repository
+                    orderRepo.removeOrder(order.getClOrdId());
+                    // remove from book
+                    book.removeOrder(order.getClOrdId());
+                    executions.sendUnSolCancel(sessionId, order, order.getClOrdId(), "IOC/FOK Auto Canceled");
+                }
+            }
+            return;
+        }
+
+        // STOP ORDERS → DO NOT TOUCH BOOK
+        if (ordTypeVal == OrdType.STOP_LIMIT || ordTypeVal == OrdType.STOP_STOP_LOSS) { {
+            stopOrderManager.addStopOrder(order, BigDecimal.valueOf(stopPx.getValue()));
+            logger.info("Stop order parked: {}", order.getClOrdId());
+        }
+        }
     }
 
     /* -------- CANCEL -------- */

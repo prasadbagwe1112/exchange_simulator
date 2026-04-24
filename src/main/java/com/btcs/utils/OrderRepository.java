@@ -27,6 +27,7 @@ public class OrderRepository {
             new ConcurrentHashMap<>();
 
     public void saveNewOrder(
+            String account,
             String orderId,
             String clOrdId,
             String symbol,
@@ -45,6 +46,7 @@ public class OrderRepository {
     ) {
 
         Order order = new Order(
+                account,
                 orderId,
                 clOrdId,
                 symbol,
