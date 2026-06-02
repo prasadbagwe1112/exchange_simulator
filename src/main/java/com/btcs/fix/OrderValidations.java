@@ -36,6 +36,7 @@ public class OrderValidations {
             Symbol symbol,
             Order storedOrder,
             Price price,
+            OrderQty orderQty,
             StopPx stopPx,
             OrderBook book,
             Side side
@@ -55,6 +56,10 @@ public class OrderValidations {
             return ValidationResult.reject(
                     "Symbol not supported, use any one from - " + ALLOWED_SYMBOLS);
         }
+
+        // quantity validation
+        result = validateQuantity(storedOrder, orderQty);
+        if (result != null) return result;
 
         // price validations
         result = validatePrice(ordTypeVal, symbol, price, stopPx, config);
@@ -240,11 +245,17 @@ public class OrderValidations {
 
     private ValidationResult validateQuantity(Order storedOrder, OrderQty orderQty) {
 
-        BigDecimal leavesQty = BigDecimal.valueOf(orderQty.getValue())
-                .subtract(storedOrder.getCumQty());
-
-        if (leavesQty.compareTo(BigDecimal.ZERO) <= 0) {
+        if  (orderQty.getValue() <= 0){
             return ValidationResult.reject("Invalid Order Quantity");
+        }
+
+        if (storedOrder != null) {
+            BigDecimal leavesQty = BigDecimal.valueOf(orderQty.getValue())
+                    .subtract(storedOrder.getCumQty());
+
+            if (leavesQty.compareTo(BigDecimal.ZERO) <= 0) {
+                return ValidationResult.reject("Invalid Order Quantity");
+            }
         }
 
         return null;

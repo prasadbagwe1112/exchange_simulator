@@ -56,7 +56,7 @@ public class HandleIncomingMsg {
 
         Order existingOrder = orderRepo.getOrder(clOrdID.getValue());  
         OrderBook book = orderBookManager.getBook(symbol.getValue());
-        ValidationResult result = validations.validateNewOrder(ordType, tif, symbol, existingOrder, price, stopPx, book, side);
+        ValidationResult result = validations.validateNewOrder(ordType, tif, symbol, existingOrder, price, qty, stopPx, book, side);
         if (!result.isValid()) {
             rejectOrder(sessionId, clOrdID, symbol, side, ordType, tif, qty, price, stopPx, OrdRejReason.OTHER, result.getRejectReason());
             return;
