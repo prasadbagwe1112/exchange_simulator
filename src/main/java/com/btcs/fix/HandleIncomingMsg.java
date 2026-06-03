@@ -53,10 +53,11 @@ public class HandleIncomingMsg {
         TimeInForce tif = new TimeInForce(order.getChar(TimeInForce.FIELD));
         OrderID orderID = new OrderID("ORD-" + System.currentTimeMillis());
         StopPx stopPx = getStopPriceForStopOrder(order, orderType);
+        TransactTime transactTime = new TransactTime(order.getUtcTimeStamp(TransactTime.FIELD));
 
         Order existingOrder = orderRepo.getOrder(clOrdID.getValue());  
         OrderBook book = orderBookManager.getBook(symbol.getValue());
-        ValidationResult result = validations.validateNewOrder(ordType, tif, symbol, existingOrder, price, qty, stopPx, book, side);
+        ValidationResult result = validations.validateNewOrder(ordType, tif, symbol, existingOrder, price, qty, stopPx, book, side, transactTime);
         if (!result.isValid()) {
             rejectOrder(sessionId, clOrdID, symbol, side, ordType, tif, qty, price, stopPx, OrdRejReason.OTHER, result.getRejectReason());
             return;
@@ -95,13 +96,14 @@ public class HandleIncomingMsg {
         Side side = new Side(replace.getChar(Side.FIELD));
         TimeInForce tif = new TimeInForce(replace.getChar(TimeInForce.FIELD));
         OrderQty quantity = new OrderQty(replace.getDouble(OrderQty.FIELD));
+        TransactTime transactTime = new TransactTime(replace.getUtcTimeStamp(TransactTime.FIELD));
 
         Price price = getPrice(replace, ordType.getValue(), side);
         StopPx stopPx = getStopPriceForStopOrder(replace, ordType.getValue());
 
         Order storedOrder = orderRepo.getOrder(origClOrdID.getValue());
 
-        ValidationResult result = validations.validateReplace(storedOrder, ordType, symbol, side, tif, quantity, price, stopPx, account);
+        ValidationResult result = validations.validateReplace(storedOrder, ordType, symbol, side, tif, quantity, price, stopPx, account, transactTime);
         if (!result.isValid()) {
         	rejectCxl(sessionId, clOrdID, origClOrdID, CxlRejResponseTo.ORDER_CANCEL_REPLACE_REQUEST,
             		CxlRejReason.OTHER, result.getRejectReason());
@@ -196,16 +198,17 @@ public class HandleIncomingMsg {
 
         OrigClOrdID origClOrdID = new OrigClOrdID(cancel.getString(OrigClOrdID.FIELD));
         ClOrdID clOrdID = new ClOrdID(cancel.getString(ClOrdID.FIELD));
+        TransactTime transactTime = new TransactTime(cancel.getUtcTimeStamp(TransactTime.FIELD));
 
         Order storedOrder = orderRepo.getOrder(origClOrdID.getValue());
 
-        ValidationResult result = validations.validateCancelorOSR(storedOrder);
+        ValidationResult result = validations.validateCancelorOSR(storedOrder, transactTime);
         if (!result.isValid()) {
         	rejectCxl(sessionId, clOrdID, origClOrdID, CxlRejResponseTo.ORDER_CANCEL_REQUEST,
         			CxlRejReason.TOO_LATE_TO_CANCEL, result.getRejectReason());
         	return;
         }
-        
+
         // remove from repository
         orderRepo.removeOrder(origClOrdID.getValue());
         
@@ -222,9 +225,10 @@ public class HandleIncomingMsg {
         ClOrdID clOrdID = new ClOrdID(ordStatusReq.getString(ClOrdID.FIELD));
         Symbol symbol = new Symbol(ordStatusReq.getString(Symbol.FIELD));
         Side side = new Side(ordStatusReq.getChar(Side.FIELD));
+        TransactTime transactTime = new TransactTime(ordStatusReq.getUtcTimeStamp(TransactTime.FIELD));
 
         Order storedOrder = orderRepo.getOrder(clOrdID.getValue());
-        ValidationResult result = validations.validateCancelorOSR(storedOrder);
+        ValidationResult result = validations.validateCancelorOSR(storedOrder, transactTime);
         if (!result.isValid()) {
         	rejectOrderOSR(sessionId, clOrdID, symbol, side, OrdRejReason.OTHER, result.getRejectReason());
             return;

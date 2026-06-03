@@ -4,6 +4,9 @@ import java.math.BigDecimal;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
+import java.time.Duration;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 
 import com.btcs.utils.*;
 import quickfix.field.*;
@@ -29,6 +32,11 @@ public class OrderValidations {
     private static final Set<Character> IOC_FOK =
             Set.of(TimeInForce.IMMEDIATE_OR_CANCEL, TimeInForce.FILL_OR_KILL);
 
+    private static final long MAX_TRANSACT_TIME_AGE_SECONDS = 5;
+
+    private static final DateTimeFormatter TS_FMT =
+            DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss.SSS");
+
     /* -------- NEW ORDER VALIDATION -------- */
     public ValidationResult validateNewOrder(
             OrdType ordType,
@@ -39,7 +47,8 @@ public class OrderValidations {
             OrderQty orderQty,
             StopPx stopPx,
             OrderBook book,
-            Side side
+            Side side,
+            TransactTime transactTime
     ) {
 
         char ordTypeVal = ordType.getValue();
@@ -48,6 +57,10 @@ public class OrderValidations {
 
         // basic validations
         ValidationResult result = validateBasic(ordTypeVal, tifVal, storedOrder);
+        if (result != null) return result;
+
+        // tag 60 / TransactTime validation
+        result = validateTransactTime(transactTime);
         if (result != null) return result;
 
         // symbol config
@@ -82,7 +95,8 @@ public class OrderValidations {
             OrderQty orderQty,
             Price price,
             StopPx stopPx,
-            Account account
+            Account account,
+            TransactTime transactTime
     ) {
 
         if (storedOrder == null) {
@@ -108,14 +122,22 @@ public class OrderValidations {
         result = validatePrice(ordType.getValue(), symbol, price, stopPx, config);
         if (result != null) return result;
 
+        // tag 60 / TransactTime validation
+        result = validateTransactTime(transactTime);
+        if (result != null) return result;
+
         return ValidationResult.ok();
     }
 
-    /* -------- CANCEL VALIDATION -------- */
-    public ValidationResult validateCancelorOSR(Order storedOrder) {
-        return (storedOrder == null)
-                ? ValidationResult.reject("Order not found")
-                : ValidationResult.ok();
+    /* -------- CANCEL VALIDATION and OSR-------- */
+    public ValidationResult validateCancelorOSR(Order storedOrder, TransactTime transactTime) {
+
+        // tag 60 / TransactTime validation
+        ValidationResult result = validateTransactTime(transactTime);
+        if (result != null) return result;
+        if (storedOrder == null) return ValidationResult.reject("Order not found");
+
+        return ValidationResult.ok();
     }
 
     /* ----------------- Helper methods ------------------------- */
@@ -183,6 +205,26 @@ public class OrderValidations {
                 return ValidationResult.reject(
                         "Invalid Stop Price: outside ±10% band of reference price (" + ref + ")");
             }
+        }
+
+        return null;
+    }
+
+    private ValidationResult validateTransactTime(TransactTime transactTime) {
+        LocalDateTime nowUtc = LocalDateTime.now(java.time.Clock.systemUTC());
+        LocalDateTime orderTransactTime = transactTime.getValue();
+
+        String orderTime = orderTransactTime.format(TS_FMT);
+        String nowTime = nowUtc.format(TS_FMT);
+
+        long ageSeconds = Duration.between(orderTransactTime, nowUtc).getSeconds();
+
+        if (ageSeconds > MAX_TRANSACT_TIME_AGE_SECONDS) {
+            return ValidationResult.reject(
+                    "Stale order: TransactTime " + orderTime +
+                            " is older than " + MAX_TRANSACT_TIME_AGE_SECONDS +
+                            " seconds; current time " + nowTime
+            );
         }
 
         return null;
