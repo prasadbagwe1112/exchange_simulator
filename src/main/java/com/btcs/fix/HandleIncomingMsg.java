@@ -7,6 +7,8 @@ import quickfix.Message;
 import quickfix.SessionID;
 import quickfix.FieldNotFound;
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -225,7 +227,7 @@ public class HandleIncomingMsg {
         ClOrdID clOrdID = new ClOrdID(ordStatusReq.getString(ClOrdID.FIELD));
         Symbol symbol = new Symbol(ordStatusReq.getString(Symbol.FIELD));
         Side side = new Side(ordStatusReq.getChar(Side.FIELD));
-        TransactTime transactTime = new TransactTime(ordStatusReq.getUtcTimeStamp(TransactTime.FIELD));
+        TransactTime transactTime = new TransactTime(LocalDateTime.now(java.time.Clock.systemUTC()));
 
         Order storedOrder = orderRepo.getOrder(clOrdID.getValue());
         ValidationResult result = validations.validateCancelorOSR(storedOrder, transactTime);
