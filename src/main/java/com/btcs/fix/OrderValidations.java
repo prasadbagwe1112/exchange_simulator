@@ -19,6 +19,8 @@ public class OrderValidations {
     private static final Set<Character> ALLOWED_ORD_TYPES =
             Set.of(OrdType.LIMIT, OrdType.MARKET, OrdType.STOP_LIMIT, OrdType.STOP_STOP_LOSS);
 
+    private static final Set<Character> ALLOWED_SIDE = Set.of(Side.BUY, Side.SELL);
+
     private static final Set<Character> LIMIT_MKT =
             Set.of(OrdType.LIMIT, OrdType.MARKET);
 
@@ -56,7 +58,7 @@ public class OrderValidations {
         char sideVal = side.getValue();
 
         // basic validations
-        ValidationResult result = validateBasic(ordTypeVal, tifVal, storedOrder);
+        ValidationResult result = validateBasic(sideVal, ordTypeVal, tifVal, storedOrder);
         if (result != null) return result;
 
         // tag 60 / TransactTime validation
@@ -142,7 +144,11 @@ public class OrderValidations {
 
     /* ----------------- Helper methods ------------------------- */
 
-    private ValidationResult validateBasic(char ordType, char tif, Order storedOrder) {
+    private ValidationResult validateBasic(char side, char ordType, char tif, Order storedOrder) {
+
+        if (!ALLOWED_SIDE.contains(side)) {
+            return ValidationResult.reject("Invalid Order Side");
+        }
 
         if (!ALLOWED_ORD_TYPES.contains(ordType)) {
             return ValidationResult.reject("Invalid Order Type");

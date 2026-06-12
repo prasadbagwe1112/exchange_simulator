@@ -279,6 +279,7 @@ public class Executions {
         execReport.set(new TimeInForce(order.getTimeInForce()));
         execReport.set(new OrdType(order.getOrdType()));
         execReport.set(new ExecRestatementReason(ExecRestatementReason.OTHER));
+        execReport.set(new TransactTime());
         execReport.set(new Text(text));
         
         if(order.getOrdType() == OrdType.LIMIT || order.getOrdType() == OrdType.STOP_LIMIT)
@@ -337,6 +338,7 @@ public class Executions {
         execReport.set(new OrderQty(order.getOrderQty().doubleValue()));
         execReport.set(new TimeInForce(order.getTimeInForce()));
         execReport.set(new OrdType(order.getOrdType()));
+        execReport.set(new TransactTime());
         
         if(order.getOrdType() == OrdType.LIMIT || order.getOrdType() == OrdType.STOP_LIMIT)
         	execReport.set(new Price(order.getPrice().doubleValue()));
@@ -364,6 +366,7 @@ public class Executions {
         execReport.set(new TimeInForce(order.getTimeInForce()));
         execReport.set(new OrdType(order.getOrdType()));
         execReport.set(new Account(order.getAccount()));
+        execReport.set(new TransactTime());
         
         if(order.getOrdType() == OrdType.LIMIT || order.getOrdType() == OrdType.STOP_LIMIT)
         	execReport.set(new Price(order.getPrice().doubleValue()));
